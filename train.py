@@ -14,6 +14,7 @@ import copy
 from PIL import Image
 from external import get_expon_lr_func
 
+
 def initialize_optimizer(params, variables):
     lrs = {
         'means3D': 0.00016 * variables['scene_radius'],  # 需要衰减到 0.0000016*variables['scene_radius']
@@ -22,7 +23,6 @@ def initialize_optimizer(params, variables):
         'unnorm_rotations': 0.001,
         'logit_opacities': 0.05,
         'log_scales': 0.001,
-
     }
     param_groups = [{'params': [v], 'name': k, 'lr': lrs[k]} for k, v in params.items()]
     return torch.optim.Adam(param_groups, lr=0.0, eps=1e-15)
@@ -58,7 +58,8 @@ def get_loss(params, curr_data,variables):
     rendervar = params2rendervar(params)  # 初始化一些 cuda 输入数据
     rendervar['means2D'].retain_grad()
     raster_settings = get_settings(curr_data)
-    render_image, radius, _, = Renderer(raster_settings=raster_settings)(**rendervar)
+    render_image, radius, _ = Renderer(raster_settings=raster_settings)(**rendervar)
+
 
     gt_image = curr_data["im"]  # 已经在cuda里面了
     loss_l1 = l1_loss_v1(render_image,gt_image)
@@ -108,14 +109,14 @@ def train(exp_name , datapath):
                 param_group['lr'] = lr
                 break
         # 2. 调整 sh维度
-        if i % 1000 == 0 and dataset[0]["cam"]['sh_degree'] < 3 :
+        if i % 1000 == 0 and dataset[0]["cam"]['sh_degree'] < 3:
             level_up_sh(dataset,todo_dataset)
         # 3. 提取需要训练到数据
         if not todo_dataset:
             todo_dataset = copy.deepcopy(dataset)
         curr_data = todo_dataset.pop(randint(0, len(todo_dataset) - 1)) 
-        # curr_data = todo_dataset[80]
-
+        # curr_data = todo_dataset[0]
+        # 4. 训练
         loss, variables,psnr = get_loss(params, curr_data, variables)
         loss.backward()
         with torch.no_grad():
@@ -123,20 +124,24 @@ def train(exp_name , datapath):
             params, variables = densify(params, variables, optimizer, i)
             optimizer.step()
             optimizer.zero_grad(set_to_none=True)
-
-        if  i == 7000 or i == 30000:
+        # 5. 保存模型
+        if  i == 7000 or i == 24000 or i == 30000:
             print("save model in {} iteration".format(i))
             output_params = params2cpu(params)
             seq = os.path.basename(datapath)
             save_params(output_params,exp_name,seq)
 
 
+
     progress_bar.close()
 
 
+
 if __name__=='__main__':
-    exp_name = "blender"  # 采用的数据集
-    train(exp_name,"/data1/wujiahao/dataset/nerf/lego")
+    # exp_name = "blender"  # 采用的数据集
+    exp_name = "colmap"
+    # /data1/wujiahao/dataset/gs/4K_Studios_Show_Pair_f16f17 /data1/wujiahao/dataset/nerf/lego  /data1/wujiahao/dataset/gs/1080_Kungfu_Basic_Pair_c24c25
+    train(exp_name,"/data1/wujiahao/dataset/gs/1080_Kungfu_Basic_Pair_c24c25") 
 
 
 

@@ -1,5 +1,5 @@
 import numpy as np
-from helpers import setup_camera,o3d_knn,  fov2focal,inverse_sigmoid
+from helpers import setup_camera,o3d_knn,  fov2focal,inverse_sigmoid,RGB2SH,save_intri
 import torch
 import os
 import json
@@ -7,15 +7,21 @@ from PIL import Image
 import copy
 import matplotlib.pyplot as plt
 
-def read_json(path, file_name ):
+
+def read_json(path, file_name):
     cam_centers = []
     dataset = []
     h,w = 800,800
     cx,cy = 400,400
-    # f = open('w2c.txt','w')
+
     with open(os.path.join(path,file_name)) as json_file:
         contents = json.load(json_file)
         fovx = contents["camera_angle_x"]
+        fx = fov2focal(fovx,w)
+        k = np.zeros((3,3),dtype=float)
+        k[0][0], k[1][1], k[0][2], k[1][2] = fx, fx, cx, cy
+        save_intri(k,'blender',os.path.basename(path))
+
         frames = contents["frames"]
         for idx, frame in enumerate(frames):
 
@@ -25,18 +31,9 @@ def read_json(path, file_name ):
             c2w[:3, 1:3] *= -1
             # get the world-to-camera transform and set R, T
             w2c = np.linalg.inv(c2w)
-            # f.write(str(w2c))
-
             cam_centers.append(c2w[:3,3])  # 其实就是用 [0,0,0,1] 乘出来的
-            fx = fov2focal(fovx,w)
-            k = np.zeros((3,3),dtype=float)
-            k[0][0], k[1][1], k[0][2], k[1][2] = fx, fx, cx, cy
             cam = setup_camera(h, w, k, w2c, near=0.01, far=100)
-
             image_path = os.path.join(path, frame["file_path"] + ".png")
-            # im = np.array(copy.deepcopy(Image.open(image_path)))   # [800,800,4]  错误的
-            # im = im[:,:,:3] * im[:,:,3:4]                            # bg = [0,0,0]
-            # im = torch.tensor(im).float().cuda().permute(2, 0, 1) / 255   # [3,800,800]
 
             bg = [0,0,0]  # 如果需要白色背景可以改成 [1,1,1]
             norm_data = np.array(Image.open(image_path).convert("RGBA")) / 255.0
@@ -54,7 +51,7 @@ def read_blender(path):
     print(f"Generating random point cloud ({num_pts})...")
     # We create random points inside the bounds of the synthetic Blender scenes
     xyz = np.random.random((num_pts, 3)) * 2.6 - 1.3  # 这个是怎么确定的？
-    feature_dc = np.random.random((num_pts,1, 3)) / 255.0
+    feature_dc = RGB2SH(np.random.random((num_pts,1, 3)) / 255.0)   # 没有RGB2SH好像影响不大
     feature_rest = np.zeros((num_pts,15,3))
 
     sq_dist, _ = o3d_knn(xyz,3) 
@@ -84,9 +81,9 @@ def read_blender(path):
                  'scene_radius': scene_radius,
                  'means2D_gradient_accum': torch.zeros(num_pts).cuda().float(),
                  'denom': torch.zeros(num_pts).cuda().float()}
-    
 
-    return params, variables,dataset
+
+    return params, variables, dataset
     
 
 
