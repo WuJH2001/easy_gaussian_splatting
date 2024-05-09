@@ -140,8 +140,7 @@ def train(exp_name , datapath):
 if __name__=='__main__':
     # exp_name = "blender"  # 采用的数据集
     exp_name = "colmap"
-    # /data1/wujiahao/dataset/gs/4K_Studios_Show_Pair_f16f17 /data1/wujiahao/dataset/nerf/lego  /data1/wujiahao/dataset/gs/1080_Kungfu_Basic_Pair_c24c25
-    train(exp_name,"/data1/wujiahao/dataset/gs/1080_Kungfu_Basic_Pair_c24c25") 
+    train(exp_name,"/data1/dataset/gs/1080_Kungfu_Basic_Pair_c24c25") 
 
 
 
